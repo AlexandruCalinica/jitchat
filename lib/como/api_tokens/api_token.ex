@@ -31,6 +31,7 @@ defmodule Como.ApiTokens.ApiToken do
   # since they're used for programmatic access
   @api_token_validity_in_days 365
   @api_token_prefix "cos_"
+  @app_token_prefix "app_"
 
   @primary_key {:id, :string, autogenerate: false}
   schema "api_tokens" do
@@ -57,21 +58,15 @@ defmodule Como.ApiTokens.ApiToken do
   """
   def build_api_token(user, name, opts \\ []) do
     scopes = Keyword.get(opts, :scopes, ["read"])
-
-    expires_in_days =
-      Keyword.get(opts, :expires_in_days, @api_token_validity_in_days)
+    expires_in_days = Keyword.get(opts, :expires_in_days, @api_token_validity_in_days)
+    prefix = Keyword.get(opts, :prefix, @api_token_prefix)
 
     token = :crypto.strong_rand_bytes(@rand_size)
     hashed_token = :crypto.hash(@hash_algorithm, token)
 
-    # Create a user-friendly token with prefix
-    encoded_token =
-      @api_token_prefix <> Base.url_encode64(token, padding: false)
+    encoded_token = prefix <> Base.url_encode64(token, padding: false)
 
-    expires_at =
-      DateTime.utc_now()
-      |> DateTime.add(expires_in_days * 24 * 60 * 60, :second)
-      |> DateTime.truncate(:second)
+    expires_at = calculate_expiration(expires_in_days)
 
     {encoded_token,
      %ApiToken{
@@ -83,6 +78,14 @@ defmodule Como.ApiTokens.ApiToken do
        expires_at: expires_at,
        active: true
      }}
+  end
+
+  defp calculate_expiration(nil), do: nil
+
+  defp calculate_expiration(days) when is_integer(days) do
+    DateTime.utc_now()
+    |> DateTime.add(days * 24 * 60 * 60, :second)
+    |> DateTime.truncate(:second)
   end
 
   @doc """
@@ -133,13 +136,21 @@ defmodule Como.ApiTokens.ApiToken do
   def extract_token_from_bearer(_), do: :error
 
   defp extract_raw_token(@api_token_prefix <> encoded_token) do
+    decode_token(encoded_token)
+  end
+
+  defp extract_raw_token(@app_token_prefix <> encoded_token) do
+    decode_token(encoded_token)
+  end
+
+  defp extract_raw_token(_), do: :error
+
+  defp decode_token(encoded_token) do
     case Base.url_decode64(encoded_token, padding: false) do
       {:ok, raw_token} -> {:ok, raw_token}
       :error -> :error
     end
   end
-
-  defp extract_raw_token(_), do: :error
 
   @doc """
   Updates the last_used_at timestamp for an API token.

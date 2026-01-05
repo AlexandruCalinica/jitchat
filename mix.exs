@@ -1,4 +1,3 @@
-defmodule Como.MixProject do
   use Mix.Project
 
   def project do

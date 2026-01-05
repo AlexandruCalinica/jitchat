@@ -5,25 +5,20 @@ defmodule ComoWeb.AuthController do
 
   def index(conn, _params) do
     conn
-    # |> assign_prop(:page_title, "Sign In | CustomerOS")
-    # |> render_inertia("Signin")
+    |> render(:index)
   end
 
   def send_magic_link(conn, %{"email" => email}) do
     case Users.login_or_register_user(email) do
       {:ok, _user} ->
         conn
-        |> put_flash(:info, "Welcome back!")
+        |> put_flash(:info, "Check your email for a magic link!")
         |> redirect(to: ~p"/signin")
 
       {:error, _errors} ->
         conn
-        # conn
-        # |> assign_prop(:page_title, "Sign In | CustomerOS")
-        # |> assign_prop(:errors, %{
-        #   email: Keyword.get(errors, :email, "Something went wrong")
-        # })
-        # |> render_inertia("Signin")
+        |> put_flash(:error, "Something went wrong. Please try again.")
+        |> redirect(to: ~p"/signin")
     end
   end
 

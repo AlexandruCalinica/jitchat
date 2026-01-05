@@ -24,6 +24,12 @@ defmodule ComoWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :api_authenticated do
+    plug :accepts, ["json"]
+    plug :fetch_session
+    plug :authenticate_user_flexible
+  end
+
   scope "/", ComoWeb do
     pipe_through :browser
 
@@ -39,10 +45,35 @@ defmodule ComoWeb.Router do
     get "/signup/token/:token", AuthController, :signup_with_token
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", ComoWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", ComoWeb do
+    pipe_through :api_authenticated
+
+    post "/uploads/images", UploadController, :create
+
+    get "/tokens", ApiTokenController, :index
+    post "/tokens", ApiTokenController, :create
+    delete "/tokens/:id", ApiTokenController, :delete
+  end
+
+  scope "/auth", ComoWeb do
+    pipe_through [:browser, :fetch_current_user]
+
+    get "/tauri/login", TauriAuthController, :login
+    get "/tauri/callback", TauriAuthController, :callback
+  end
+
+  scope "/auth", ComoWeb do
+    pipe_through :api
+
+    post "/tauri/token", TauriAuthController, :token
+  end
+
+  scope "/auth", ComoWeb do
+    pipe_through :api_authenticated
+
+    get "/me", TauriAuthController, :me
+    post "/tauri/logout", TauriAuthController, :logout
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:como, :dev_routes) do

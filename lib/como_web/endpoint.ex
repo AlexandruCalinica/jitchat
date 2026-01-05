@@ -52,5 +52,6 @@ defmodule ComoWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+  plug ComoWeb.Plugs.CORS
   plug ComoWeb.Router
 end

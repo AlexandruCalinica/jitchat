@@ -57,12 +57,13 @@ defmodule ComoWeb.UserAuth do
 
   def signup_user(conn, user, params \\ %{}) do
     token = Users.generate_user_session_token(user)
+    user_return_to = get_session(conn, :user_return_to)
 
     conn
     |> renew_session()
     |> put_token_in_session(token)
     |> maybe_write_remember_me_cookie(token, params)
-    |> redirect(to: signed_up_path(conn))
+    |> redirect(to: user_return_to || signed_up_path(conn))
   end
 
   defp maybe_write_remember_me_cookie(conn, token, %{"remember_me" => "true"}) do
@@ -89,9 +90,21 @@ defmodule ComoWeb.UserAuth do
   #     end
   #
   defp renew_session(conn) do
+    tauri_redirect_uri = get_session(conn, :tauri_redirect_uri)
+    tauri_state = get_session(conn, :tauri_state)
+
     conn
     |> configure_session(renew: true)
     |> clear_session()
+    |> maybe_restore_tauri_session(tauri_redirect_uri, tauri_state)
+  end
+
+  defp maybe_restore_tauri_session(conn, nil, _state), do: conn
+
+  defp maybe_restore_tauri_session(conn, redirect_uri, state) do
+    conn
+    |> put_session(:tauri_redirect_uri, redirect_uri)
+    |> put_session(:tauri_state, state)
   end
 
   @doc """
