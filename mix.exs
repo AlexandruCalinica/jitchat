@@ -1,3 +1,4 @@
+defmodule Como.MixProject do
   use Mix.Project
 
   def project do
@@ -62,7 +63,8 @@
       {:y_ex, "~> 0.8.0"},
       {:nanoid, "~> 2.1.0"},
       {:temp, "~> 0.4"},
-      {:domainatrex, "~> 3.0"}
+      {:domainatrex, "~> 3.0"},
+      {:dotenv, "~> 3.1"}
     ]
   end
 

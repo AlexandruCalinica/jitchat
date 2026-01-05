@@ -1,4 +1,5 @@
 import Config
+Dotenv.load!()
 
 get_env = fn key, default -> System.get_env(key, default) end
 
