@@ -6,6 +6,8 @@ defmodule ComoWeb.TauriAuthController do
   def login(conn, params) do
     redirect_uri = Map.get(params, "redirect_uri")
     state = Map.get(params, "state")
+    prompt = Map.get(params, "prompt")
+    current_user = conn.assigns[:current_user]
 
     cond do
       is_nil(redirect_uri) ->
@@ -13,12 +15,19 @@ defmodule ComoWeb.TauriAuthController do
         |> put_status(:bad_request)
         |> json(%{error: %{code: "missing_redirect_uri", message: "redirect_uri is required"}})
 
-      is_nil(conn.assigns[:current_user]) ->
+      is_nil(current_user) ->
         conn
         |> put_session(:tauri_redirect_uri, redirect_uri)
         |> put_session(:tauri_state, state)
         |> put_session(:user_return_to, ~p"/auth/tauri/callback")
         |> redirect(to: ~p"/signin")
+
+      prompt == "select_account" ->
+        conn
+        |> put_session(:tauri_redirect_uri, redirect_uri)
+        |> put_session(:tauri_state, state)
+        |> put_resp_content_type("text/html")
+        |> send_resp(200, account_picker_html(conn, current_user))
 
       true ->
         handle_authenticated_login(conn, redirect_uri, state)
@@ -46,6 +55,59 @@ defmodule ComoWeb.TauriAuthController do
         |> delete_session(:tauri_state)
         |> handle_authenticated_login(redirect_uri, state)
     end
+  end
+
+  def choose(conn, %{"choice" => "continue"}) do
+    redirect_uri = get_session(conn, :tauri_redirect_uri)
+    state = get_session(conn, :tauri_state)
+    user = conn.assigns[:current_user]
+
+    cond do
+      is_nil(redirect_uri) ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: %{code: "missing_session", message: "No pending Tauri auth session"}})
+
+      is_nil(user) ->
+        conn
+        |> put_session(:user_return_to, ~p"/auth/tauri/callback")
+        |> redirect(to: ~p"/signin")
+
+      true ->
+        conn
+        |> delete_session(:tauri_redirect_uri)
+        |> delete_session(:tauri_state)
+        |> handle_authenticated_login(redirect_uri, state)
+    end
+  end
+
+  def choose(conn, %{"choice" => "different"}) do
+    redirect_uri = get_session(conn, :tauri_redirect_uri)
+    state = get_session(conn, :tauri_state)
+
+    if is_nil(redirect_uri) do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: %{code: "missing_session", message: "No pending Tauri auth session"}})
+    else
+      # Clear the user from this auth flow only (don't log out of web app entirely)
+      # We configure_session(renew: true) to get a fresh session, but keep tauri params
+      conn
+      |> configure_session(renew: true)
+      |> clear_session()
+      |> put_session(:tauri_redirect_uri, redirect_uri)
+      |> put_session(:tauri_state, state)
+      |> put_session(:user_return_to, ~p"/auth/tauri/callback")
+      |> redirect(to: ~p"/signin")
+    end
+  end
+
+  def choose(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      error: %{code: "invalid_choice", message: "choice must be 'continue' or 'different'"}
+    })
   end
 
   def token(conn, params) do
@@ -197,5 +259,61 @@ defmodule ComoWeb.TauriAuthController do
     conn
     |> put_status(status)
     |> json(%{error: %{code: code, message: message}})
+  end
+
+  defp account_picker_html(_conn, user) do
+    csrf_token = Plug.CSRFProtection.get_csrf_token()
+    email = user.email
+    initial = String.first(email) |> String.upcase()
+
+    """
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Choose an account</title>
+      <style>
+        body { font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
+        .container { text-align: center; padding: 2rem; background: white; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px; width: 90%; }
+        h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; color: #1a202c; }
+        .subtitle { color: #718096; margin-bottom: 2rem; }
+        .account { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f7fafc; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+        .avatar { width: 48px; height: 48px; border-radius: 50%; background: #3182ce; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 600; }
+        .email { text-align: left; font-weight: 500; color: #2d3748; word-break: break-all; }
+        .actions { display: flex; flex-direction: column; gap: 0.75rem; }
+        .btn { display: block; width: 100%; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; text-decoration: none; box-sizing: border-box; }
+        .btn-primary { background: #3182ce; color: white; }
+        .btn-primary:hover { background: #2c5282; }
+        .btn-secondary { background: transparent; color: #3182ce; border: 1px solid #3182ce; }
+        .btn-secondary:hover { background: #ebf8ff; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>Choose an account</h1>
+        <p class="subtitle">to continue to the app</p>
+        
+        <div class="account">
+          <div class="avatar">#{initial}</div>
+          <div class="email">#{Phoenix.HTML.html_escape(email) |> Phoenix.HTML.safe_to_string()}</div>
+        </div>
+        
+        <div class="actions">
+          <form action="/auth/tauri/choose" method="post">
+            <input type="hidden" name="_csrf_token" value="#{csrf_token}" />
+            <input type="hidden" name="choice" value="continue" />
+            <button type="submit" class="btn btn-primary">Continue as #{Phoenix.HTML.html_escape(email) |> Phoenix.HTML.safe_to_string()}</button>
+          </form>
+          
+          <form action="/auth/tauri/choose" method="post">
+            <input type="hidden" name="_csrf_token" value="#{csrf_token}" />
+            <input type="hidden" name="choice" value="different" />
+            <button type="submit" class="btn btn-secondary">Use a different account</button>
+          </form>
+        </div>
+      </div>
+    </body>
+    </html>
+    """
   end
 end

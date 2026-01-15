@@ -1,53 +1,100 @@
 defmodule ComoWeb.UserSocket do
+  @moduledoc """
+  Phoenix Socket for WebSocket connections.
+
+  Handles authentication via API tokens or session tokens and assigns
+  user information to the socket for use by channels.
+  """
+
   require Logger
   use Phoenix.Socket
 
-  # A Socket handler
-  #
-  # It's possible to control the websocket connection and
-  # assign values that can be accessed by your channel topics.
+  alias Como.ApiTokens
+  alias Como.Users
+  alias Como.Users.ColorManager
 
   ## Channels
 
   channel "documents:*", ComoWeb.Channels.DocumentsChannel
   channel "events:*", ComoWeb.Channels.EventsChannel
+  channel "follow:*", ComoWeb.Channels.FollowChannel
 
-  # Socket params are passed from the client and can
-  # be used to verify and authenticate a user. After
-  # verification, you can put default assigns into
-  # the socket that will be set for all channels, ie
-  #
-  #     {:ok, assign(socket, :user_id, verified_user_id)}
-  #
-  # To deny connection, return `:error` or `{:error, term}`. To control the
-  # response the client receives in that case, [define an error handler in the
-  # websocket
-  # configuration](https://hexdocs.pm/phoenix/Phoenix.Endpoint.html#socket/3-websocket-configuration).
-  #
-  # See `Phoenix.Token` documentation for examples in
-  # performing token verification on connect.
+  @doc """
+  Authenticates the socket connection using a token.
 
-  # @impl true
-  # def connect(_params, socket, _connect_info) do
-  #   Logger.info "Reached connect in user_socket.ex"
-  #   {:ok, socket}
-  # end
-
+  Supports both API tokens (Bearer format) and session tokens.
+  On success, assigns user_id, username, color, and user to the socket.
+  """
   @impl true
+  def connect(%{"token" => token}, socket, _connect_info) when is_binary(token) do
+    case authenticate_token(token) do
+      {:ok, user} ->
+        {:ok, color} = ColorManager.assign_color(user.id)
+        username = extract_username(user.email)
+
+        socket =
+          socket
+          |> assign(:user_id, user.id)
+          |> assign(:user, user)
+          |> assign(:username, username)
+          |> assign(:color, color)
+          |> assign(:tenant_id, user.tenant_id)
+
+        Logger.debug(
+          "Socket connected for user #{user.id} (#{username}) in tenant #{user.tenant_id}"
+        )
+
+        {:ok, socket}
+
+      {:error, reason} ->
+        Logger.warning("Socket connection failed: #{reason}")
+        :error
+    end
+  end
+
+  # Allow unauthenticated connections for backward compatibility with documents channel
   def connect(_params, socket, _connect_info) do
     {:ok, socket}
   end
 
-  # Socket id's are topics that allow you to identify all sockets for a given user:
-  #
-  #     def id(socket), do: "user_socket:#{socket.assigns.user_id}"
-  #
-  # Would allow you to broadcast a "disconnect" event and terminate
-  # all active sockets and channels for a given user:
-  #
-  #     Elixir.Web.Endpoint.broadcast("user_socket:#{user.id}", "disconnect", %{})
-  #
-  # Returning `nil` makes this socket anonymous.
+  @doc """
+  Returns a unique socket ID for the user, enabling targeted disconnects.
+  """
   @impl true
-  def id(_socket), do: nil
+  def id(socket) do
+    case socket.assigns[:user_id] do
+      nil -> nil
+      user_id -> "user_socket:#{user_id}"
+    end
+  end
+
+  defp authenticate_token(token) do
+    case try_api_token(token) do
+      {:ok, user} -> {:ok, user}
+      :not_api_token -> try_session_token(token)
+    end
+  end
+
+  defp try_api_token(token) do
+    case ApiTokens.verify_api_token(token) do
+      {:ok, user, _api_token} -> {:ok, user}
+      {:error, :invalid_token} -> :not_api_token
+    end
+  end
+
+  defp try_session_token(token) do
+    case Users.get_user_by_session_token(token) do
+      %Como.Users.User{} = user -> {:ok, user}
+      nil -> {:error, :invalid_session_token}
+    end
+  end
+
+  defp extract_username(email) when is_binary(email) do
+    email
+    |> String.split("@")
+    |> List.first()
+    |> String.capitalize()
+  end
+
+  defp extract_username(_), do: "Anonymous"
 end

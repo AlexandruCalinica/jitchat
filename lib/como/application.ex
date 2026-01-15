@@ -12,10 +12,10 @@ defmodule Como.Application do
       Como.Repo,
       {DNSCluster, query: Application.get_env(:como, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Como.PubSub},
-      # Start a worker by calling: Como.Worker.start_link(arg)
-      # {Como.Worker, arg},
-      # Start to serve requests, typically the last entry
-      ComoWeb.Endpoint,
+      Como.Users.ColorManager,
+      Como.Follow.FollowState,
+      ComoWeb.Channels.FollowPresence,
+      ComoWeb.Endpoint
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

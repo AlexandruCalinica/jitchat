@@ -60,6 +60,7 @@ defmodule ComoWeb.Router do
 
     get "/tauri/login", TauriAuthController, :login
     get "/tauri/callback", TauriAuthController, :callback
+    post "/tauri/choose", TauriAuthController, :choose
   end
 
   scope "/auth", ComoWeb do

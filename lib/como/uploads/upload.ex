@@ -65,6 +65,7 @@ defmodule Como.Uploads.Upload do
   def changeset(upload, attrs) do
     upload
     |> cast(attrs, [
+      :id,
       :filename,
       :content_type,
       :size,
@@ -81,11 +82,12 @@ defmodule Como.Uploads.Upload do
     |> validate_dimensions()
   end
 
-  defp maybe_put_id(%Ecto.Changeset{data: %{id: nil}} = changeset) do
-    put_change(changeset, :id, Como.Utils.IdGenerator.generate_id_16("img"))
+  defp maybe_put_id(changeset) do
+    case get_field(changeset, :id) do
+      nil -> put_change(changeset, :id, Como.Utils.IdGenerator.generate_id_16("img"))
+      _ -> changeset
+    end
   end
-
-  defp maybe_put_id(changeset), do: changeset
 
   defp validate_content_type(changeset) do
     validate_change(changeset, :content_type, fn :content_type, content_type ->

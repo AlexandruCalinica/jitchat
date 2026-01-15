@@ -76,21 +76,27 @@ defmodule Como.Uploads do
   end
 
   defp identify_image(path) do
-    case System.cmd("identify", ["-format", "%w %h", path], stderr_to_stdout: true) do
-      {output, 0} ->
-        case String.trim(output) |> String.split(" ") do
-          [width_str, height_str] ->
-            case {Integer.parse(width_str), Integer.parse(height_str)} do
-              {{width, _}, {height, _}} -> {:ok, {width, height}}
-              _ -> {:error, :parse_error}
+    case System.find_executable("identify") do
+      nil ->
+        {:error, :identify_not_available}
+
+      _executable ->
+        case System.cmd("identify", ["-format", "%w %h", path], stderr_to_stdout: true) do
+          {output, 0} ->
+            case String.trim(output) |> String.split(" ") do
+              [width_str, height_str] ->
+                case {Integer.parse(width_str), Integer.parse(height_str)} do
+                  {{width, _}, {height, _}} -> {:ok, {width, height}}
+                  _ -> {:error, :parse_error}
+                end
+
+              _ ->
+                {:error, :parse_error}
             end
 
-          _ ->
-            {:error, :parse_error}
+          {_error, _code} ->
+            {:error, :identify_failed}
         end
-
-      {_error, _code} ->
-        {:error, :identify_not_available}
     end
   end
 
