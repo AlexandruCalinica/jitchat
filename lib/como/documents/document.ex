@@ -41,7 +41,7 @@ defmodule Como.Documents.Document do
     field(:user_id, :string)
     field(:icon, :string)
     field(:color, :string)
-    field(:ref_id, :string, virtual: true)
+    field(:ref_id, :string)
 
     timestamps(type: :utc_datetime)
   end
@@ -59,6 +59,41 @@ defmodule Como.Documents.Document do
     ])
     |> maybe_put_id()
     |> validate_required([:name, :tenant_id, :body, :user_id, :icon, :color])
+  end
+
+  def channel_document_changeset(document, attrs) do
+    document
+    |> cast(attrs, [:name, :tenant_id, :user_id, :body, :icon, :color, :ref_id])
+    |> maybe_put_id()
+    |> maybe_put_title()
+    |> put_defaults()
+    |> validate_required([:name, :tenant_id, :user_id, :ref_id])
+  end
+
+  defp put_defaults(changeset) do
+    changeset
+    |> put_default(:body, "")
+    |> put_default(:icon, "file-02")
+    |> put_default(:color, "#6b7280")
+  end
+
+  defp put_default(changeset, field, value) do
+    case get_field(changeset, field) do
+      nil -> put_change(changeset, field, value)
+      _ -> changeset
+    end
+  end
+
+  defp maybe_put_title(%Ecto.Changeset{} = changeset) do
+    case get_field(changeset, :name) do
+      nil -> put_change(changeset, :name, generate_title())
+      "" -> put_change(changeset, :name, generate_title())
+      _ -> changeset
+    end
+  end
+
+  defp generate_title do
+    Calendar.strftime(DateTime.utc_now(), "%d %b %Y")
   end
 
   def update_changeset(document, attrs) do

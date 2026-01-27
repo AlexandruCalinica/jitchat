@@ -64,7 +64,11 @@ defmodule Como.MixProject do
       {:nanoid, "~> 2.1.0"},
       {:temp, "~> 0.4"},
       {:domainatrex, "~> 3.0"},
-      {:dotenv, "~> 3.1"}
+      {:dotenv, "~> 3.1"},
+      {:image, "~> 0.54"},
+      # Electric SQL + Phoenix.Sync for real-time Postgres sync
+      {:electric, ">= 1.0.0-beta.20"},
+      {:phoenix_sync, "~> 0.3"}
     ]
   end
 

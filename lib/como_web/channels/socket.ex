@@ -39,6 +39,7 @@ defmodule ComoWeb.UserSocket do
           |> assign(:username, username)
           |> assign(:color, color)
           |> assign(:tenant_id, user.tenant_id)
+          |> assign(:avatar_url, user.avatar_url)
 
         Logger.debug(
           "Socket connected for user #{user.id} (#{username}) in tenant #{user.tenant_id}"

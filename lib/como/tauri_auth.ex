@@ -68,7 +68,8 @@ defmodule Como.TauriAuth do
       id: user.id,
       email: user.email,
       username: extract_username(user.email),
-      color: generate_user_color(user.id)
+      color: generate_user_color(user.id),
+      avatar_url: user.avatar_url
     }
   end
 

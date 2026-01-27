@@ -15,7 +15,7 @@ defmodule Como.Application do
       Como.Users.ColorManager,
       Como.Follow.FollowState,
       ComoWeb.Channels.FollowPresence,
-      ComoWeb.Endpoint
+      {ComoWeb.Endpoint, phoenix_sync: Phoenix.Sync.plug_opts()}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

@@ -53,6 +53,24 @@ defmodule ComoWeb.Router do
     get "/tokens", ApiTokenController, :index
     post "/tokens", ApiTokenController, :create
     delete "/tokens/:id", ApiTokenController, :delete
+
+    post "/avatars", AvatarController, :create
+    delete "/avatars", AvatarController, :delete
+
+    get "/channels", ChannelController, :index
+    post "/channels", ChannelController, :create
+    get "/channels/:id", ChannelController, :show
+    patch "/channels/:id", ChannelController, :update
+    delete "/channels/:id", ChannelController, :delete
+    post "/channels/:channel_id/documents", ChannelController, :create_document
+    patch "/channels/:channel_id/documents/:id", ChannelController, :update_document
+    delete "/channels/:channel_id/documents/:id", ChannelController, :delete_document
+  end
+
+  scope "/api", ComoWeb do
+    pipe_through :api
+
+    get "/avatars/:user_id", AvatarController, :show
   end
 
   scope "/auth", ComoWeb do
@@ -74,6 +92,19 @@ defmodule ComoWeb.Router do
 
     get "/me", TauriAuthController, :me
     post "/tauri/logout", TauriAuthController, :logout
+  end
+
+  scope "/sync", ComoWeb do
+    pipe_through :api_authenticated
+
+    get "/channels", SyncController, :channels
+    get "/documents", SyncController, :documents
+  end
+
+  scope "/api", ComoWeb do
+    pipe_through :api_authenticated
+
+    post "/mutate", MutateController, :mutate
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

@@ -25,6 +25,7 @@ defmodule ComoWeb.Channels.FollowChannel do
   @impl true
   def handle_info(:after_join, socket) do
     %{user_id: user_id, username: username, color: color, tenant_id: tenant_id} = socket.assigns
+    avatar_url = socket.assigns[:avatar_url]
     topic = presence_topic(tenant_id)
 
     :ok = Follow.register_user(user_id, username, color, self())
@@ -34,6 +35,7 @@ defmodule ComoWeb.Channels.FollowChannel do
         user_id: user_id,
         username: username,
         color: color,
+        avatar_url: avatar_url,
         current_doc_id: nil,
         online_at: System.system_time(:millisecond)
       })
@@ -104,13 +106,16 @@ defmodule ComoWeb.Channels.FollowChannel do
         notify_leader_follow_started(leader_id, socket.assigns)
 
         leader_meta = get_presence_meta(topic, leader_id)
+        leader_scroll = get_leader_scroll(leader_id)
 
         {:reply,
          {:ok,
           %{
             leader: %{
               doc_id: leader_meta[:current_doc_id],
-              scroll_top: nil
+              scroll_top: leader_scroll[:scroll_top],
+              scroll_left: leader_scroll[:scroll_left],
+              viewport_height: leader_scroll[:viewport_height]
             }
           }}, socket}
     end
@@ -313,6 +318,13 @@ defmodule ComoWeb.Channels.FollowChannel do
   defp get_presence_meta(topic, user_id) do
     case FollowPresence.list(topic)[user_id] do
       %{metas: [meta | _]} -> meta
+      _ -> %{}
+    end
+  end
+
+  defp get_leader_scroll(leader_id) do
+    case Follow.get_user_state(leader_id) do
+      {:ok, %{last_scroll: scroll}} when not is_nil(scroll) -> scroll
       _ -> %{}
     end
   end
