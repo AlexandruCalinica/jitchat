@@ -27,7 +27,8 @@ defmodule Como.Users.User do
              :tenant_id,
              :inserted_at,
              :updated_at,
-             :admin
+             :admin,
+             :avatar_url
            ]}
   @primary_key {:id, :string, autogenerate: false}
   schema "users" do
@@ -37,6 +38,7 @@ defmodule Como.Users.User do
     field(:domain, :string, virtual: true)
     field(:tenant_name, :string, virtual: true)
     field(:admin, :boolean, default: false)
+    field(:avatar_url, :string)
     timestamps(type: :utc_datetime)
   end
 
@@ -49,7 +51,8 @@ defmodule Como.Users.User do
           tenant_name: String.t() | nil,
           inserted_at: DateTime.t(),
           updated_at: DateTime.t(),
-          admin: boolean()
+          admin: boolean(),
+          avatar_url: String.t() | nil
         }
 
   @doc """
